@@ -8,6 +8,7 @@ import authRoutes from "./routes/authRoutes.js";
 import academicRoutes from "./routes/academicRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import feeRoutes from "./routes/feeRoutes.js";
+import dormRoutes from "./routes/dormRoutes.js";
 
 dotenv.config();
 
@@ -31,5 +32,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api", academicRoutes);        // /api/classes, /api/subjects, /api/school-config
 app.use("/api/students", studentRoutes);
 app.use("/api/fees", feeRoutes);
+app.use("/api/dorms", dormRoutes);
 
 export default app;
