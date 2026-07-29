@@ -34,6 +34,29 @@ const academicYearSchema = new mongoose.Schema(
   { _id: true }
 );
 
+// Admission-time defaults — fully configurable per school, since one deployment
+// might be a day school with no dorms, another a mixed boarding school, etc.
+const admissionSettingsSchema = new mongoose.Schema(
+  {
+    // "askEachTime" -> admin picks male/female per student
+    // "allMale" / "allFemale" -> every admitted student is set to that gender automatically
+    genderMode: {
+      type: String,
+      enum: ["askEachTime", "allMale", "allFemale"],
+      default: "askEachTime",
+    },
+    // "none" -> no dorm assignment at all (day schools)
+    // "single" -> school has exactly one dorm, auto-assigned, no picker shown
+    // "multiple" -> admin picks from the Dorms list
+    dormMode: {
+      type: String,
+      enum: ["none", "single", "multiple"],
+      default: "none",
+    },
+  },
+  { _id: false }
+);
+
 const schoolSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -56,6 +79,8 @@ const schoolSchema = new mongoose.Schema(
 
     // Admission number format, e.g. "ADM-{YEAR}-{SEQ:3}"
     admissionNumberFormat: { type: String, default: "ADM-{YEAR}-{SEQ}" },
+
+    admissionSettings: { type: admissionSettingsSchema, default: () => ({}) },
 
     gradingSystem: {
       type: String,
