@@ -171,3 +171,53 @@ export const reversePayment = async (req, res) => {
     session.endSession();
   }
 };
+
+// GET /api/fees/summary-by-class?academicYear=&term=
+// Real aggregation instead of N client-side calls — one query, grouped server-side.
+export const getFeeSummaryByClass = async (req, res) => {
+  const { academicYear, term } = req.query;
+  const match = {};
+  if (academicYear) match.academicYear = academicYear;
+  if (term) match.term = term;
+
+  const summary = await FeeInvoice.aggregate([
+    { $match: match },
+    {
+      $lookup: {
+        from: "students",
+        localField: "student",
+        foreignField: "_id",
+        as: "studentDoc",
+      },
+    },
+    { $unwind: "$studentDoc" },
+    {
+      $group: {
+        _id: "$studentDoc.class",
+        collected: { $sum: "$totalPaid" },
+        arrears: { $sum: "$balance" },
+      },
+    },
+    {
+      $lookup: {
+        from: "classes",
+        localField: "_id",
+        foreignField: "_id",
+        as: "classDoc",
+      },
+    },
+    { $unwind: "$classDoc" },
+    {
+      $project: {
+        _id: 0,
+        name: "$classDoc.name",
+        order: "$classDoc.order",
+        collected: 1,
+        arrears: 1,
+      },
+    },
+    { $sort: { order: 1 } },
+  ]);
+
+  res.json({ summary });
+};
