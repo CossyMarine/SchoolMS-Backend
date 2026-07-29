@@ -105,7 +105,7 @@ export const deleteSubject = async (req, res) => {
   res.json({ message: "Subject deleted" });
 };
 
-/* ---------------- SCHOOL CONFIG (fee types, academic years/terms) ---------------- */
+/* ---------------- SCHOOL CONFIG (fee types, academic years/terms, admission settings) ---------------- */
 
 // GET /api/school-config
 export const getSchoolConfig = async (req, res) => {
@@ -123,6 +123,12 @@ export const updateSchoolConfig = async (req, res) => {
   for (const field of allowed) {
     if (req.body[field] !== undefined) school[field] = req.body[field];
   }
+
+  if (req.body.admissionSettings && typeof req.body.admissionSettings === "object") {
+    const current = school.admissionSettings?.toObject ? school.admissionSettings.toObject() : school.admissionSettings || {};
+    school.admissionSettings = { ...current, ...req.body.admissionSettings };
+  }
+
   await school.save();
 
   await logAction({ actor: req.user, action: "SCHOOL_CONFIG_UPDATED", targetType: "School", targetId: school._id, details: req.body, req });
