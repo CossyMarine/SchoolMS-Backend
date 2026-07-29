@@ -15,4 +15,11 @@ counterSchema.statics.nextSequence = async function (key) {
   return counter.seq;
 };
 
+// Read-only peek at what the *next* sequence value will be, without
+// incrementing anything — used to preview an admission number in the UI.
+counterSchema.statics.peekNextSequence = async function (key) {
+  const counter = await this.findOne({ key });
+  return (counter?.seq || 0) + 1;
+};
+
 export default mongoose.model("Counter", counterSchema);
