@@ -1,25 +1,46 @@
 // controllers/academicController.js
 import Class from "../models/Class.js";
 import Subject from "../models/Subject.js";
+import Teacher from "../models/Teacher.js";
+import Student from "../models/Student.js";
 import School from "../models/School.js";
 import { logAction } from "../models/AuditLog.js";
 
 /* ---------------- CLASSES ---------------- */
 
-// POST /api/classes  { name, level, streams: [], order }
+// accepts streams as ["East","West"] or [{name, capacity}]
+function normalizeStreams(streams) {
+  if (!Array.isArray(streams)) return [];
+  return streams
+    .map((s) =>
+      typeof s === "string"
+        ? { name: s.trim(), capacity: null }
+        : { name: s.name?.trim(), capacity: s.capacity ?? null }
+    )
+    .filter((s) => s.name);
+}
+
+// POST /api/classes  { name, level, streams, capacity, order, promotesTo, isGraduating }
 export const createClass = async (req, res) => {
   try {
-    const { name, level, streams, order } = req.body;
+    const { name, level, streams, capacity, order, promotesTo, isGraduating } = req.body;
     if (!name || !level) return res.status(400).json({ message: "Name and level are required" });
 
     const exists = await Class.findOne({ name: name.trim() });
     if (exists) return res.status(409).json({ message: "A class with this name already exists" });
 
+    if (promotesTo && isGraduating) {
+      return res.status(400).json({ message: "A class can't both promote and be graduating" });
+    }
+
     const classDoc = await Class.create({
       name: name.trim(),
       level,
-      streams: (streams || []).map((s) => s.trim()).filter(Boolean),
+      streams: normalizeStreams(streams),
+      capacity: capacity ?? null,
       order: order ?? 0,
+      promotesTo: promotesTo || null,
+      isGraduating: !!isGraduating,
     });
 
     await logAction({ actor: req.user, action: "CLASS_CREATED", targetType: "Class", targetId: classDoc._id, details: { name, level }, req });
@@ -33,29 +54,45 @@ export const createClass = async (req, res) => {
 export const listClasses = async (req, res) => {
   const filter = {};
   if (req.query.level) filter.level = req.query.level;
-  const classes = await Class.find(filter).sort({ order: 1, name: 1 });
+  const classes = await Class.find(filter).sort({ order: 1, name: 1 }).populate("promotesTo", "name level");
   res.json({ classes });
 };
 
 // PATCH /api/classes/:id
 export const updateClass = async (req, res) => {
-  const { name, level, streams, order } = req.body;
-  const classDoc = await Class.findById(req.params.id);
-  if (!classDoc) return res.status(404).json({ message: "Class not found" });
+  try {
+    const { name, level, streams, capacity, order, promotesTo, isGraduating } = req.body;
+    const classDoc = await Class.findById(req.params.id);
+    if (!classDoc) return res.status(404).json({ message: "Class not found" });
 
-  if (name) classDoc.name = name.trim();
-  if (level) classDoc.level = level;
-  if (streams) classDoc.streams = streams.map((s) => s.trim()).filter(Boolean);
-  if (order !== undefined) classDoc.order = order;
-  await classDoc.save();
+    if (name) classDoc.name = name.trim();
+    if (level) classDoc.level = level;
+    if (streams) classDoc.streams = normalizeStreams(streams);
+    if (capacity !== undefined) classDoc.capacity = capacity;
+    if (order !== undefined) classDoc.order = order;
 
-  await logAction({ actor: req.user, action: "CLASS_UPDATED", targetType: "Class", targetId: classDoc._id, details: req.body, req });
-  res.json({ class: classDoc });
+    const nextGraduating = isGraduating !== undefined ? !!isGraduating : classDoc.isGraduating;
+    const nextPromotesTo = promotesTo !== undefined ? promotesTo || null : classDoc.promotesTo;
+    if (nextPromotesTo && nextGraduating) {
+      return res.status(400).json({ message: "A class can't both promote and be graduating" });
+    }
+    if (nextPromotesTo && String(nextPromotesTo) === String(classDoc._id)) {
+      return res.status(400).json({ message: "A class can't promote into itself" });
+    }
+    classDoc.isGraduating = nextGraduating;
+    classDoc.promotesTo = nextPromotesTo;
+
+    await classDoc.save();
+
+    await logAction({ actor: req.user, action: "CLASS_UPDATED", targetType: "Class", targetId: classDoc._id, details: req.body, req });
+    res.json({ class: classDoc });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update class", error: err.message });
+  }
 };
 
 // DELETE /api/classes/:id — blocked if students are enrolled
 export const deleteClass = async (req, res) => {
-  const Student = (await import("../models/Student.js")).default;
   const inUse = await Student.exists({ class: req.params.id, status: "active" });
   if (inUse) {
     return res.status(409).json({ message: "Cannot delete a class with active students enrolled" });
@@ -65,6 +102,100 @@ export const deleteClass = async (req, res) => {
 
   await logAction({ actor: req.user, action: "CLASS_DELETED", targetType: "Class", targetId: classDoc._id, details: { name: classDoc.name }, req });
   res.json({ message: "Class deleted" });
+};
+
+/* ---------------- CLASS TEACHERS (Teacher.classTeacherOf is the source of truth) ---------------- */
+
+// GET /api/classes/:id/teachers — one row per stream (or one row for an unstreamed class)
+export const getClassTeachers = async (req, res) => {
+  const classDoc = await Class.findById(req.params.id);
+  if (!classDoc) return res.status(404).json({ message: "Class not found" });
+
+  const teachers = await Teacher.find({ "classTeacherOf.class": classDoc._id }).populate("user", "fullName email");
+
+  const streamNames = classDoc.streams.length ? classDoc.streams.map((s) => s.name) : [""];
+  const rows = streamNames.map((streamName) => ({
+    stream: streamName,
+    teacher: teachers.find((t) => (t.classTeacherOf.stream || "") === streamName) || null,
+  }));
+
+  res.json({ rows });
+};
+
+// PATCH /api/classes/:id/class-teacher  { teacherId, stream }
+// stream must be "" for an unstreamed class, or match one of classDoc.streams[].name
+export const setClassTeacher = async (req, res) => {
+  const { teacherId, stream } = req.body;
+  const classDoc = await Class.findById(req.params.id);
+  if (!classDoc) return res.status(404).json({ message: "Class not found" });
+
+  const validStream = classDoc.streams.length ? classDoc.streams.some((s) => s.name === stream) : !stream;
+  if (!validStream) return res.status(400).json({ message: "That stream doesn't exist on this class" });
+
+  // clear whoever currently holds this class + stream
+  await Teacher.updateMany(
+    { "classTeacherOf.class": classDoc._id, "classTeacherOf.stream": stream || "" },
+    { $set: { classTeacherOf: { class: null, stream: "" } } }
+  );
+
+  if (!teacherId) return res.json({ teacher: null });
+
+  const teacher = await Teacher.findByIdAndUpdate(
+    teacherId,
+    { classTeacherOf: { class: classDoc._id, stream: stream || "" } },
+    { new: true }
+  ).populate("user", "fullName email");
+
+  await logAction({ actor: req.user, action: "CLASS_TEACHER_SET", targetType: "Class", targetId: classDoc._id, details: { teacherId, stream }, req });
+  res.json({ teacher });
+};
+
+/* ---------------- STREAM REBALANCING ---------------- */
+
+// POST /api/classes/:id/rebalance-streams  { streams: [{name, capacity}] }
+// Replaces the class's stream list and redistributes currently-enrolled active
+// students evenly (round-robin, ordered by admission number for a stable split).
+export const rebalanceStreams = async (req, res) => {
+  try {
+    const classDoc = await Class.findById(req.params.id);
+    if (!classDoc) return res.status(404).json({ message: "Class not found" });
+
+    const newStreams = normalizeStreams(req.body.streams);
+    if (newStreams.length === 0) {
+      return res.status(400).json({ message: "Provide at least one stream to rebalance into" });
+    }
+
+    const students = await Student.find({ class: classDoc._id, status: "active" }).sort({ admissionNumber: 1 });
+
+    const buckets = newStreams.map(() => []);
+    students.forEach((student, i) => buckets[i % newStreams.length].push(student._id));
+
+    const bulkOps = buckets
+      .map((studentIds, i) => ({
+        updateMany: { filter: { _id: { $in: studentIds } }, update: { $set: { stream: newStreams[i].name } } },
+      }))
+      .filter((op) => op.updateMany.filter._id.$in.length);
+    if (bulkOps.length) await Student.bulkWrite(bulkOps);
+
+    classDoc.streams = newStreams;
+    await classDoc.save();
+
+    await logAction({
+      actor: req.user,
+      action: "CLASS_STREAMS_REBALANCED",
+      targetType: "Class",
+      targetId: classDoc._id,
+      details: { newStreams: newStreams.map((s) => s.name), studentsMoved: students.length },
+      req,
+    });
+
+    res.json({
+      class: classDoc,
+      distribution: newStreams.map((s, i) => ({ stream: s.name, count: buckets[i].length })),
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to rebalance streams", error: err.message });
+  }
 };
 
 /* ---------------- SUBJECTS ---------------- */
@@ -107,13 +238,11 @@ export const deleteSubject = async (req, res) => {
 
 /* ---------------- SCHOOL CONFIG (fee types, academic years/terms, admission settings) ---------------- */
 
-// GET /api/school-config
 export const getSchoolConfig = async (req, res) => {
   const school = await School.getConfig();
   res.json({ school });
 };
 
-// PATCH /api/school-config
 export const updateSchoolConfig = async (req, res) => {
   const school = await School.getConfig();
   const allowed = [
@@ -135,7 +264,6 @@ export const updateSchoolConfig = async (req, res) => {
   res.json({ school });
 };
 
-// POST /api/school-config/fee-types  { name, code, isRecurringPerTerm, appliesTo }
 export const addFeeType = async (req, res) => {
   const school = await School.getConfig();
   school.feeTypes.push(req.body);
@@ -145,7 +273,6 @@ export const addFeeType = async (req, res) => {
   res.status(201).json({ feeTypes: school.feeTypes });
 };
 
-// POST /api/school-config/academic-years  { year, terms: [{name, startDate, endDate}] }
 export const addAcademicYear = async (req, res) => {
   const school = await School.getConfig();
   const { year, terms } = req.body;
@@ -157,7 +284,6 @@ export const addAcademicYear = async (req, res) => {
   res.status(201).json({ academicYears: school.academicYears });
 };
 
-// PATCH /api/school-config/academic-years/:yearId/set-current
 export const setCurrentTerm = async (req, res) => {
   const school = await School.getConfig();
   const { yearId } = req.params;
@@ -166,7 +292,6 @@ export const setCurrentTerm = async (req, res) => {
   res.json({ academicYears: school.academicYears });
 };
 
-// GET /api/public/school-info — no auth required, powers the landing page
 export const getPublicSchoolInfo = async (req, res) => {
   const school = await School.getConfig();
   res.json({
