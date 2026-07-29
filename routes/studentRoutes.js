@@ -9,6 +9,7 @@ import {
   updateStudent,
   changeStudentClass,
   archiveStudent,
+  getMyStudentRecords,
 } from "../controllers/studentController.js";
 import { importStudents, importTeachers } from "../controllers/importController.js";
 
@@ -23,6 +24,7 @@ router.post("/", checkPermission("admissions"), admitStudent);
 router.patch("/:id", checkPermission("admissions"), updateStudent);
 router.post("/:id/class-change", checkPermission("admissions"), changeStudentClass);
 router.patch("/:id/archive", checkPermission("admissions"), archiveStudent);
+router.get("/me", getMyStudentRecords); // student/parent self-service — no admin permission required
 
 router.post(
   "/import",
