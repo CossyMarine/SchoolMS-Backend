@@ -13,6 +13,13 @@ const studentSchema = new mongoose.Schema(
     class: { type: mongoose.Schema.Types.ObjectId, ref: "Class", required: true },
     stream: { type: String, trim: true }, // e.g. "East" — matches a stream name on the Class doc
 
+    // Boarding assignment — null/undefined for day scholars or day-only schools
+    dorm: { type: mongoose.Schema.Types.ObjectId, ref: "Dorm", default: null },
+
+    // Informational tag only — "Class President", "Head Girl", etc. Never grants
+    // any system permission; purely a label shown on the student's profile.
+    displayRole: { type: String, trim: true, default: "" },
+
     guardians: [
       {
         user: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // parent login, if created
@@ -51,5 +58,6 @@ const studentSchema = new mongoose.Schema(
 
 studentSchema.index({ admissionNumber: 1 });
 studentSchema.index({ class: 1, stream: 1 });
+studentSchema.index({ dorm: 1 });
 
 export default mongoose.model("Student", studentSchema);
