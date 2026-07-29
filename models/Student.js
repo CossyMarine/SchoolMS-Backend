@@ -13,6 +13,8 @@ const studentSchema = new mongoose.Schema(
     class: { type: mongoose.Schema.Types.ObjectId, ref: "Class", required: true },
     stream: { type: String, trim: true }, // e.g. "East" — matches a stream name on the Class doc
 
+    action: { type: String, enum: ["enrolled", "promoted", "repeated", "transferred", "graduated"] },
+    
     // Boarding assignment — null/undefined for day scholars or day-only schools
     dorm: { type: mongoose.Schema.Types.ObjectId, ref: "Dorm", default: null },
 
