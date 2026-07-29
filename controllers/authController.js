@@ -7,10 +7,11 @@ import { logAction } from "../models/AuditLog.js";
 const signToken = (userId) =>
   jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
+// Updated cookie configuration to support cross-site setups (e.g., separate frontend/backend domains)
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
+  secure: true, // Must be true when sameSite is "none"
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
