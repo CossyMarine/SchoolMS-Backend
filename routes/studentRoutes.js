@@ -7,9 +7,11 @@ import {
   listStudents,
   getStudent,
   updateStudent,
+  updateGuardians,
   changeStudentClass,
   archiveStudent,
   getMyStudentRecords,
+  previewNextAdmissionNumber,
 } from "../controllers/studentController.js";
 import { importStudents, importTeachers } from "../controllers/importController.js";
 
@@ -18,13 +20,16 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 router.use(protect);
 
+router.get("/next-admission-number", checkPermission("admissions"), previewNextAdmissionNumber);
+router.get("/me", getMyStudentRecords); // student/parent self-service — no admin permission required
+
 router.get("/", checkPermission("admissions"), listStudents);
 router.get("/:id", checkPermission("admissions"), getStudent);
 router.post("/", checkPermission("admissions"), admitStudent);
 router.patch("/:id", checkPermission("admissions"), updateStudent);
+router.patch("/:id/guardians", checkPermission("admissions"), updateGuardians);
 router.post("/:id/class-change", checkPermission("admissions"), changeStudentClass);
 router.patch("/:id/archive", checkPermission("admissions"), archiveStudent);
-router.get("/me", getMyStudentRecords); // student/parent self-service — no admin permission required
 
 router.post(
   "/import",
