@@ -11,5 +11,4 @@ router.get("/student/:studentId", checkPermission("fees"), getStudentStatement);
 router.post("/payments", authorize("admin", "moderator"), checkPermission("fees"), recordPayment);
 router.post("/payments/:id/reverse", authorize("admin"), reversePayment); // admin-only, deliberately not moderator-delegable
 
-router.set = router; // no-op, keeps linter quiet if unused
 export default router;
