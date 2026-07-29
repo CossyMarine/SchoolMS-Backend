@@ -14,6 +14,7 @@ import {
   previewNextAdmissionNumber,
 } from "../controllers/studentController.js";
 import { importStudents, importTeachers } from "../controllers/importController.js";
+import { getStudentSubjects, addStudentElective, removeStudentElective } from "../controllers/subjectAssignmentController.js";
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -31,6 +32,9 @@ router.patch("/:id/guardians", checkPermission("admissions"), updateGuardians);
 router.post("/:id/class-change", checkPermission("admissions"), changeStudentClass);
 router.patch("/:id/archive", checkPermission("admissions"), archiveStudent);
 
+router.get("/:id/subjects", checkPermission("admissions"), getStudentSubjects);
+router.post("/:id/electives", checkPermission("admissions"), addStudentElective);
+router.delete("/:id/electives/:subjectId", checkPermission("admissions"), removeStudentElective);
 router.post(
   "/import",
   authorize("admin", "moderator"),
