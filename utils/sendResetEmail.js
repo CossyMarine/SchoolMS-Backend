@@ -2,8 +2,8 @@
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+const SCHOOL_NAME = process.env.SCHOOL_NAME || "EduCore";
 
-// sendResetEmail({ to, code, fullName })
 const sendResetEmail = async ({ to, code, fullName }) => {
   const html = `
 <!DOCTYPE html>
@@ -14,8 +14,8 @@ const sendResetEmail = async ({ to, code, fullName }) => {
       <td align="center">
         <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
           <tr>
-            <td align="center" style="background:#f97316;padding:30px 20px;">
-              <h1 style="color:#ffffff;margin:0;font-size:24px;">RestoPOS</h1>
+            <td align="center" style="background:#FF5722;padding:30px 20px;">
+              <h1 style="color:#ffffff;margin:0;font-size:24px;">${SCHOOL_NAME}</h1>
             </td>
           </tr>
           <tr>
@@ -25,7 +25,7 @@ const sendResetEmail = async ({ to, code, fullName }) => {
                 Hi ${fullName || "there"}, use the code below to reset your password. It expires in 10 minutes.
               </p>
               <div style="text-align:center;margin:28px 0;">
-                <span style="display:inline-block;letter-spacing:8px;font-size:32px;font-weight:800;color:#f97316;background:#fff7ed;padding:16px 24px;border-radius:12px;">
+                <span style="display:inline-block;letter-spacing:8px;font-size:32px;font-weight:800;color:#FF5722;background:#FFF0EB;padding:16px 24px;border-radius:12px;">
                   ${code}
                 </span>
               </div>
@@ -42,10 +42,10 @@ const sendResetEmail = async ({ to, code, fullName }) => {
 </html>`;
 
   return resend.emails.send({
-    from: "RestoPOS <noreply@restopos.online>", // replace with your verified Resend sending domain
+    from: `${SCHOOL_NAME} <noreply@yourdomain.com>`, // replace with your verified Resend sending domain
     to,
-    subject: "Your RestoPOS password reset code",
-    text: `Your RestoPOS password reset code is ${code}. It expires in 10 minutes.`,
+    subject: `Your ${SCHOOL_NAME} password reset code`,
+    text: `Your ${SCHOOL_NAME} password reset code is ${code}. It expires in 10 minutes.`,
     html,
   });
 };
