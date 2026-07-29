@@ -159,3 +159,18 @@ export const setCurrentTerm = async (req, res) => {
   await school.save();
   res.json({ academicYears: school.academicYears });
 };
+
+// GET /api/public/school-info — no auth required, powers the landing page
+export const getPublicSchoolInfo = async (req, res) => {
+  const school = await School.getConfig();
+  res.json({
+    name: school.name,
+    motto: school.motto,
+    schoolType: school.schoolType,
+    logoUrl: school.logoUrl,
+    address: school.address,
+    phone: school.phone,
+    email: school.email,
+    landingPage: school.landingPage,
+  });
+};
