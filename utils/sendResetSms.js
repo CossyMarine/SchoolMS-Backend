@@ -15,8 +15,9 @@ const client = axios.create({
 
 // channel: "sms" | "whatsapp"
 export const sendResetCode = async ({ to, code, channel = "sms" }) => {
-  const message = `Your RestoPOS password reset code is ${code}. It expires in 10 minutes.`;
-
+  
+ const message = `Your ${process.env.SCHOOL_NAME || "school portal"} password reset code is ${code}. It expires in 10 minutes.`;
+  
   // ⚠️ CONFIRM WITH OPENSMS DOCS: only /sms/send was given to us explicitly.
   // The path below for whatsapp is an assumption — check your OpenSMS
   // dashboard/docs for the actual WhatsApp endpoint + payload field names.
