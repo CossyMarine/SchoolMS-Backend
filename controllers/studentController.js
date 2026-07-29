@@ -200,3 +200,19 @@ export const archiveStudent = async (req, res) => {
 
   res.json({ student });
 };
+
+// GET /api/students/me — student sees own record, parent sees linked children
+export const getMyStudentRecords = async (req, res) => {
+  if (req.user.role === "student") {
+    const student = await Student.findOne({ user: req.user._id }).populate("class", "name streams level");
+    if (!student) return res.status(404).json({ message: "No student record linked to this account" });
+    return res.json({ students: [student] });
+  }
+
+  if (req.user.role === "parent") {
+    const students = await Student.find({ "guardians.user": req.user._id }).populate("class", "name streams level");
+    return res.json({ students });
+  }
+
+  return res.status(403).json({ message: "Not applicable for this role" });
+};
