@@ -9,6 +9,7 @@ import academicRoutes from "./routes/academicRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import feeRoutes from "./routes/feeRoutes.js";
 import dormRoutes from "./routes/dormRoutes.js";
+import promotionRoutes from "./routes/promotionRoutes.js";
 
 dotenv.config();
 
@@ -33,5 +34,6 @@ app.use("/api", academicRoutes);        // /api/classes, /api/subjects, /api/sch
 app.use("/api/students", studentRoutes);
 app.use("/api/fees", feeRoutes);
 app.use("/api/dorms", dormRoutes);
+app.use("/api/promotions", promotionRoutes);
 
 export default app;
