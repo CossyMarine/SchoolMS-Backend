@@ -135,3 +135,38 @@ export const getClassResults = async (req, res) => {
     .populate("subject", "name");
   res.json({ results });
 };
+
+// GET /api/exams/performance/summary?academicYear=&term=
+// Per-class average across approved exams only (draft/open results aren't final).
+export const getClassPerformanceSummary = async (req, res) => {
+  const { academicYear, term } = req.query;
+
+  const examFilter = { status: "approved" };
+  if (academicYear) examFilter.academicYear = academicYear;
+  if (term) examFilter.term = term;
+
+  const exams = await Exam.find(examFilter).sort({ createdAt: -1 });
+  const examIds = exams.map((e) => e._id);
+
+  const summary = await Result.aggregate([
+    { $match: { exam: { $in: examIds } } },
+    { $group: { _id: "$class", averagePercentage: { $avg: "$totalPercentage" }, resultsCount: { $sum: 1 } } },
+  ]);
+
+  const lastExamByClass = {};
+  exams.forEach((e) => {
+    e.classes.forEach((classId) => {
+      const key = String(classId);
+      if (!lastExamByClass[key]) lastExamByClass[key] = e.name; // exams sorted newest-first
+    });
+  });
+
+  res.json({
+    summary: summary.map((s) => ({
+      classId: s._id,
+      averagePercentage: Math.round(s.averagePercentage * 10) / 10,
+      resultsCount: s.resultsCount,
+      lastExamName: lastExamByClass[String(s._id)] || null,
+    })),
+  });
+};
