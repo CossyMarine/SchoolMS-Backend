@@ -4,7 +4,7 @@ import { protect, authorize, checkPermission } from "../Middlewares/auth.js";
 import { requireSubjectAssignment } from "../Middlewares/teacherScope.js";
 import {
   createExam, listExams, getMyTeachingAssignments,
-  enterResults, approveExam, getStudentReportCard, getClassResults,
+  enterResults, approveExam, getStudentReportCard, getClassResults,getClassPerformanceSummary,
 } from "../controllers/examController.js";
 
 const router = express.Router();
@@ -20,4 +20,5 @@ router.post("/:examId/approve", authorize("admin", "moderator"), checkPermission
 router.get("/:examId/student/:studentId", getStudentReportCard);
 router.get("/:examId/class/:classId", authorize("admin", "teacher", "moderator"), getClassResults);
 
+router.get("/performance/summary", getClassPerformanceSummary);
 export default router;
